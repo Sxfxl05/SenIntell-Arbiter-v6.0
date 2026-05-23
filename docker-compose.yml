@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  backend-service:
+    build: ./backend
+    container_name: arbiter_backend_node
+    ports:
+      - "8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend-service:
+    build: ./frontend
+    container_name: arbiter_dashboard_node
+    ports:
+      - "5500:80"
+    depends_on:
+      - backend-service
+
+  simulator-worker:
+    build: ./simulator
+    container_name: arbiter_simulator_node
+    depends_on:
+      - backend-service

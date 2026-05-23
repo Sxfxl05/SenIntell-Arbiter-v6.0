@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SenIntell Arbiter - SOC Security Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #030712; padding: 24px; color: #94A3B8; font-family: 'Inter', sans-serif; }
+    .dash { background: #0B0F19; min-height: 700px; display: flex; border-radius: 12px; overflow: hidden; border: 1px solid #1F293D; max-width: 1400px; margin: 0 auto; position: relative; }
+    .nav { width: 56px; background: #0D1220; border-right: 1px solid #1F293D; display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 6px; flex-shrink: 0; }
+    .nav-logo { width: 32px; height: 32px; background: #6366F1; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; flex-shrink: 0; }
+    .nav-logo svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2; }
+    .nav-item { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s, color 0.15s; color: #4B5A72; }
+    .nav-item.active { background: #131B2E; color: #6366F1; }
+    .nav-item:hover { background: #131B2E; color: #94A3B8; }
+    .nav-divider { width: 24px; height: 1px; background: #1F293D; margin: 6px 0; }
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+    .topbar { padding: 14px 18px; border-bottom: 1px solid #1F293D; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .topbar-title { font-size: 13px; font-weight: 500; color: #E2E8F0; letter-spacing: 0.3px; }
+    .topbar-subtitle { font-size: 11px; color: #4B5A72; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #10B981; }
+    .status-label { font-size: 11px; color: #10B981; font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+    .ts-label { font-size: 11px; color: #4B5A72; font-family: 'JetBrains Mono', monospace; }
+    .content { flex: 1; display: flex; min-height: 0; }
+    .center { flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 14px; gap: 12px; overflow: hidden; }
+    .view-panel-content { width: 100%; height: 100%; }
+    .cards-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; flex-shrink: 0; }
+    .card { background: #131B2E; border: 1px solid #1F293D; border-radius: 8px; padding: 12px 14px; }
+    .card-label { font-size: 10px; color: #4B5A72; letter-spacing: 0.5px; text-transform: uppercase; font-weight: 500; margin-bottom: 6px; }
+    .card-value { font-size: 20px; font-weight: 600; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+    .card-delta { font-size: 10px; color: #4B5A72; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+    .card-delta span { color: #10B981; }
+    .stream-panel { flex: 1; background: #131B2E; border: 1px solid #1F293D; border-radius: 8px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .panel-header { padding: 10px 14px; border-bottom: 1px solid #1F293D; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .panel-title { font-size: 11px; font-weight: 500; color: #94A3B8; letter-spacing: 0.4px; text-transform: uppercase; }
+    .live-badge { font-size: 10px; background: #0F2218; color: #10B981; border: 1px solid #1A3D2A; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 5px; }
+    .live-dot { width: 5px; height: 5px; border-radius: 50%; background: #10B981; animation: pulse 1.4s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .stream-body { flex: 1; overflow-y: auto; padding: 6px 0; }
+    .stream-body::-webkit-scrollbar { width: 4px; }
+    .stream-body::-webkit-scrollbar-thumb { background: #1F293D; border-radius: 2px; }
+    .log-entry { padding: 8px 14px; border-bottom: 1px solid rgba(31, 41, 61, 0.4); cursor: pointer; transition: background 0.1s; }
+    .log-entry:hover { background: rgba(255, 255, 255, 0.02); }
+    .log-entry.expanded { background: #0F1828; }
+    .log-row { display: flex; align-items: center; gap: 12px; }
+    .log-ts { font-size: 10px; color: #4B5A72; font-family: 'JetBrains Mono', monospace; min-width: 58px; }
+    .log-id { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: #64748B; min-width: 72px; }
+    .log-prompt { font-size: 11px; color: #CBD5E1; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: 'JetBrains Mono', monospace; }
+    .badge { font-size: 9px; font-weight: 600; letter-spacing: 0.4px; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; white-space: nowrap; text-transform: uppercase; }
+    .badge-l1 { background: #251507; color: #F59E0B; border: 1px solid #3D2210; }
+    .badge-l3 { background: #12102A; color: #818CF8; border: 1px solid #2A2660; }
+    .badge-ok { background: #071A11; color: #10B981; border: 1px solid #0F3322; }
+    .log-expand { color: #374151; font-size: 14px; transition: transform 0.15s; margin-left: 4px; line-height: 1; }
+    .log-entry.expanded .log-expand { transform: rotate(90deg); color: #6366F1; }
+    .log-detail { padding: 10px 14px; background: #0A1020; border-radius: 6px; margin: 8px 0 2px; border: 1px solid #1F293D; display: none; }
+    .log-entry.expanded .log-detail { display: block; }
+    .detail-row { display: flex; gap: 24px; margin-bottom: 8px; flex-wrap: wrap; }
+    .detail-item { display: flex; flex-direction: column; gap: 2px; }
+    .detail-key { font-size: 9px; color: #4B5A72; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'JetBrains Mono', monospace; }
+    .detail-val { font-size: 11px; color: #94A3B8; font-family: 'JetBrains Mono', monospace; }
+    .detail-val.hi { color: #F59E0B; }
+    .detail-val.lo { color: #10B981; }
+    .detail-val.md { color: #818CF8; }
+    .detail-reason { font-size: 11px; color: #64748B; margin-top: 6px; font-family: 'JetBrains Mono', monospace; line-height: 1.5; }
+    
+    .btn-report { background: #1E1B4B; border: 1px solid #312E81; color: #818CF8; font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 4px 10px; border-radius: 4px; cursor: pointer; transition: background 0.15s; display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; }
+    .btn-report:hover { background: #312E81; color: #E0E7FF; }
+
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(3, 7, 18, 0.85); display: none; justify-content: center; align-items: center; z-index: 9999; padding: 20px; }
+    .modal-card { background: #0B0F19; border: 1px solid #1F293D; border-radius: 12px; width: 100%; max-width: 680px; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; }
+    .modal-header { padding: 14px 20px; background: #0D1220; border-bottom: 1px solid #1F293D; display: flex; align-items: center; justify-content: space-between; }
+    .modal-body { padding: 24px; overflow-y: auto; color: #E2E8F0; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; }
+    .modal-footer { padding: 12px 20px; background: #0D1220; border-top: 1px solid #1F293D; display: flex; justify-content: flex-end; gap: 10px; }
+    .btn-secondary { background: #131B2E; border: 1px solid #1F293D; color: #94A3B8; padding: 6px 14px; border-radius: 4px; font-family: 'Inter', sans-serif; font-size: 11px; cursor: pointer; }
+    .btn-primary { background: #6366F1; border: 1px solid #4F46E5; color: #fff; padding: 6px 14px; border-radius: 4px; font-family: 'Inter', sans-serif; font-size: 11px; cursor: pointer; }
+
+    .sidebar { width: 220px; flex-shrink: 0; padding: 14px; display: flex; flex-direction: column; gap: 12px; border-left: 1px solid #1F293D; overflow: hidden; }
+    .sidebar-card { background: #131B2E; border: 1px solid #1F293D; border-radius: 8px; padding: 12px; }
+    .gauge-wrap { display: flex; flex-direction: column; align-items: center; padding: 4px 0; }
+    .gauge-svg { width: 110px; height: 68px; }
+    .gauge-val { font-size: 22px; font-weight: 600; color: #818CF8; font-family: 'JetBrains Mono', monospace; text-align: center; margin-top: 2px; }
+    .gauge-sub { font-size: 9px; color: #4B5A72; text-align: center; margin-top: 2px; letter-spacing: 0.4px; text-transform: uppercase; }
+    .mini-bars { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+    .mini-bar-row { display: flex; align-items: center; gap: 6px; }
+    .mini-bar-label { font-size: 9px; color: #4B5A72; font-family: 'JetBrains Mono', monospace; min-width: 32px; text-transform: uppercase; }
+    .mini-bar-track { flex: 1; height: 4px; background: #0B0F19; border-radius: 2px; overflow: hidden; }
+    .mini-bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+    .mini-bar-val { font-size: 9px; font-family: 'JetBrains Mono', monospace; min-width: 28px; text-align: right; color: #64748B; }
+    .latency-chart { height: 60px; position: relative; margin-top: 8px; }
+    .model-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .model-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .model-name { font-size: 10px; color: #64748B; font-family: 'JetBrains Mono', monospace; flex: 1; }
+    .model-status { font-size: 9px; font-family: 'JetBrains Mono', monospace; padding: 1px 6px; border-radius: 3px; }
+    .ms-active { background: #071A11; color: #10B981; border: 1px solid #0F3322; }
+    .sparkline-row { display: flex; gap: 1px; align-items: flex-end; height: 28px; margin-top: 10px; }
+    .spark-bar { flex: 1; border-radius: 1px; min-height: 2px; transition: opacity 0.1s, height 0.2s ease; }
+    .spark-bar:hover { opacity: 0.7; }
+    .threat-pie { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    .pie-svg { width: 52px; height: 52px; flex-shrink: 0; }
+    .pie-legend { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+    .pie-leg-row { display: flex; align-items: center; gap: 4px; }
+    .pie-dot { width: 6px; height: 6px; border-radius: 1px; flex-shrink: 0; }
+    .pie-leg-label { font-size: 9px; color: #4B5A72; font-family: 'JetBrains Mono', monospace; }
+    .pie-leg-val { font-size: 9px; color: #64748B; font-family: 'JetBrains Mono', monospace; margin-left: auto; }
+  </style>
+</head>
+<body>
+
+<div class="dash">
+  <nav class="nav" aria-label="Primary framework navigation">
+    <div class="nav-logo">
+      <svg viewBox="0 0 20 20"><polygon points="10,2 18,7 18,13 10,18 2,13 2,7" stroke-width="1.5"/><circle cx="10" cy="10" r="3"/></svg>
+    </div>
+    <div class="nav-item active" id="nav-dash" onclick="switchView('dash')" title="Dashboard"><i class="ti ti-layout-dashboard"></i></div>
+    <div class="nav-item" id="nav-threat" onclick="switchView('threat')" title="Threat Analyzer System"><i class="ti ti-radar-2"></i></div>
+    <div class="nav-item" id="nav-rules" onclick="switchView('rules')" title="Defensive Context Rules"><i class="ti ti-shield-bolt"></i></div>
+    <div class="nav-divider"></div>
+    <div class="nav-item" id="nav-audit" onclick="switchView('audit')" title="Cryptographic Audit Logs"><i class="ti ti-file-report"></i></div>
+    <div class="nav-divider"></div>
+    <div class="nav-item" style="margin-top:auto" id="nav-settings" onclick="switchView('settings')" title="System Settings Configuration"><i class="ti ti-settings"></i></div>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">SenIntell Arbiter <span style="color:#6366F1;font-weight:600">v6.0</span></div>
+        <div class="topbar-subtitle">AI MIDDLEWARE FIREWALL - SECURITY OPERATIONS HUB</div>
+      </div>
+      <div class="topbar-right">
+        <div class="status-dot"></div>
+        <span class="status-label">ALL SYSTEMS NOMINAL</span>
+        <span class="ts-label" id="clock">--:--:-- UTC</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="center">
+        <div id="view-dash" class="view-panel-content" style="display: flex; flex-direction: column; gap: 12px;">
+          <div class="cards-row">
+            <div class="card"><div class="card-label">Total Inputs Screened</div><div class="card-value" style="color:#E2E8F0" id="c-total">0</div><div class="card-delta"><span>+1.2%</span> vs 1h ago</div></div>
+            <div class="card"><div class="card-label">Veritas L1 Blocks</div><div class="card-value" style="color:#F59E0B" id="c-l1">0</div><div class="card-delta"><span style="color:#F59E0B">6.7%</span> block rate</div></div>
+            <div class="card"><div class="card-label">Sentinel Vigil L3 Quarantines</div><div class="card-value" style="color:#818CF8" id="c-l3">0</div><div class="card-delta"><span style="color:#818CF8">1.7%</span> quarantine rate</div></div>
+            <div class="card"><div class="card-label">Mean Latency (ms)</div><div class="card-value" style="color:#10B981" id="c-lat">0.0</div><div class="card-delta"><span>p99:</span> 42.1 ms</div></div>
+          </div>
+          <div class="stream-panel">
+            <div class="panel-header">
+              <span class="panel-title"><i class="ti ti-radar" style="font-size:13px;margin-right:5px;vertical-align:-1px"></i>Defense Perimeter Stream</span>
+              <span class="live-badge"><span class="live-dot"></span>LIVE</span>
+            </div>
+            <div class="stream-body" id="stream" role="log" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div id="view-threat" class="view-panel-content" style="display: none; background: #131B2E; border: 1px solid #1F293D; border-radius: 8px; padding: 20px;">
+          <p style="font-size: 14px; font-weight: 500; color: #E2E8F0; font-family: 'JetBrains Mono', monospace; margin-bottom: 15px;">
+            <i class="ti ti-radar-2" style="color: #6366F1; margin-right: 8px; vertical-align: -1px;"></i>[SENINTELL THREAT ANALYZER NODE]
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-bottom: 20px;">
+            <div style="background: #0B0F19; padding: 15px; border-radius: 6px; border: 1px solid #1F293D;">
+              <div style="color: #64748B; margin-bottom: 4px;">JAILBREAK REJECTIONS</div>
+              <div style="font-size: 20px; font-weight: 600; color: #F59E0B;" id="t-jailbreak">142</div>
+            </div>
+            <div style="background: #0B0F19; padding: 15px; border-radius: 6px; border: 1px solid #1F293D;">
+              <div style="color: #64748B; margin-bottom: 4px;">DATA LEAK QUARANTINES</div>
+              <div style="font-size: 20px; font-weight: 600; color: #818CF8;" id="t-leak">68</div>
+            </div>
+            <div style="background: #0B0F19; padding: 15px; border-radius: 6px; border: 1px solid #1F293D;">
+              <div style="color: #64748B; margin-bottom: 4px;">HEURISTIC THREAT STATE</div>
+              <div style="font-size: 16px; font-weight: 600; color: #10B981; margin-top: 4px;" id="t-risk">STABLE</div>
+            </div>
+          </div>
+          <div style="background: #0B0F19; border: 1px solid #1F293D; border-radius: 6px; padding: 15px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #64748B; line-height: 1.6;">
+            <span style="color: #6366F1;"># threat_heuristics_engine:</span> Operational.<br>
+            [STATUS] Anomaly vectors matching payload parameters synchronized successfully.
+          </div>
+        </div>
+
+        <div id="view-rules" class="view-panel-content" style="display: none; background: #131B2E; border: 1px solid #1F293D; border-radius: 8px; padding: 20px;">
+          <p style="font-size: 14px; font-weight: 500; color: #E2E8F0; font-family: 'JetBrains Mono', monospace; margin-bottom: 15px;">
+            <i class="ti ti-shield-bolt" style="color: #F59E0B; margin-right: 8px; vertical-align: -1px;"></i>[IMMUTABLE FIREWALL ARCHITECTURE RUNTIME RULES]
+          </p>
+          <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px;">
+            <div style="background: #0B0F19; padding: 12px; border-radius: 4px; border: 1px solid #1F293D; border-left: 3px solid #F59E0B;"><strong>Rule Veritas-01:</strong> Input volume restriction capped at string split thresholds &lt;= 150 words.</div>
+            <div style="background: #0B0F19; padding: 12px; border-radius: 4px; border: 1px solid #1F293D; border-left: 3px solid #6366F1;"><strong>Rule Arbiter-02:</strong> Encapsulate input data variables inside isolated contextual XML data sandboxes.</div>
+          </div>
+        </div>
+
+        <div id="view-audit" class="view-panel-content" style="display: none; background: #131B2E; border: 1px solid #1F293D; border-radius: 8px; padding: 20px; height: 100%; flex-direction: column;">
+          <p style="font-size: 14px; font-weight: 500; color: #E2E8F0; font-family: 'JetBrains Mono', monospace; margin-bottom: 15px;">
+            <i class="ti ti-file-report" style="color: #818CF8; margin-right: 8px; vertical-align: -1px;"></i>[FRAMEWORK TRANSACTION INTEGRITY BLOCK REGISTER]
+          </p>
+          <div style="flex: 1; overflow-y: auto; background: #0B0F19; border: 1px solid #1F293D; border-radius: 6px;">
+            <table style="width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 11px; text-align: left;">
+              <thead>
+                <tr style="background: #0D1220; color: #4B5A72; border-bottom: 1px solid #1F293D;">
+                  <th style="padding: 10px 14px;">BLOCK ID</th>
+                  <th style="padding: 10px 14px;">TARGETED LAYER</th>
+                  <th style="padding: 10px 14px;">PIPELINE STATUS</th>
+                  <th style="padding: 10px 14px; text-align: right;">OVERHEAD</th>
+                </tr>
+              </thead>
+              <tbody id="audit-table-body">
+                <tr style="border-bottom: 1px solid #1F293D; color: #4B5A72;"><td style="padding: 10px 14px;">TXN-84192</td><td style="padding: 10px 14px;">Veritas</td><td><span style="color:#F59E0B;">REJECTED_BY_LAYER_1</span></td><td style="padding: 10px 14px; text-align: right;">0.4ms</td></tr>
+                <tr style="border-bottom: 1px solid #1F293D; color: #4B5A72;"><td style="padding: 10px 14px;">TXN-71048</td><td style="padding: 10px 14px;">Arbiter Core</td><td><span style="color:#10B981;">SUCCESS</span></td><td style="padding: 10px 14px; text-align: right;">14.2ms</td></tr>
+                <tr style="border-bottom: 1px solid #1F293D; color: #4B5A72;"><td style="padding: 10px 14px;">TXN-63911</td><td style="padding: 10px 14px;">Sentinel Vigil</td><td><span style="color:#818CF8;">REJECTED_BY_LAYER_3</span></td><td style="padding: 10px 14px; text-align: right;">28.1ms</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="view-settings" class="view-panel-content" style="display: none; background: #131B2E; border: 1px solid #1F293D; border-radius: 8px; padding: 20px;">
+          <p style="font-size: 14px; font-weight: 500; color: #E2E8F0; font-family: 'JetBrains Mono', monospace;"><i class="ti ti-settings" style="color: #94A3B8; margin-right: 8px; vertical-align: -1px;"></i>[ARBITER SETTINGS CONFIGURATION ENGINE CONTROLS]</p>
+          <div style="margin-top: 20px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #64748B; display: flex; flex-direction: column; gap: 8px;">
+            <div>Local Host Port Connection Path: <span style="color: #10B981;">http://127.0.0.1:8000</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="sidebar-card">
+          <div class="panel-title" style="margin-bottom:8px"><i class="ti ti-brain" style="font-size:12px;margin-right:4px;color:#6366F1"></i>Sentinel Vigil Monitor</div>
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" viewBox="0 0 110 68">
+              <defs><linearGradient id="gArc" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#6366F1" stop-opacity="0.3"/><stop offset="100%" stop-color="#818CF8"/></linearGradient></defs>
+              <path d="M 10 62 A 45 45 0 0 1 100 62" fill="none" stroke="#1F293D" stroke-width="7" stroke-linecap="round"/>
+              <path id="gauge-arc" d="M 10 62 A 45 45 0 0 1 100 62" fill="none" stroke="url(#gArc)" stroke-width="7" stroke-linecap="round" stroke-dasharray="141" stroke-dashoffset="141"/>
+              <circle id="gauge-needle" cx="10" cy="62" r="4" fill="#818CF8"/>
+              <text x="55" y="52" text-anchor="middle" font-size="9" fill="#374151" font-family="JetBrains Mono,monospace">CONFIDENCE</text>
+            </svg>
+            <div class="gauge-val" id="conf-val">0.00</div>
+            <div class="gauge-sub">DistilBERT Safety</div>
+          </div>
+          <div class="mini-bars">
+            <div class="mini-bar-row"><span class="mini-bar-label">SAFE</span><div class="mini-bar-track"><div class="mini-bar-fill" id="mb-safe-fill" style="width:0%;background:#10B981"></div></div><span class="mini-bar-val" id="mb-safe">0.00</span></div>
+            <div class="mini-bar-row"><span class="mini-bar-label">TOXIC</span><div class="mini-bar-track"><div class="mini-bar-fill" id="mb-toxic-fill" style="width:0%;background:#F59E0B"></div></div><span class="mini-bar-val" id="mb-toxic">0.00</span></div>
+            <div class="mini-bar-row"><span class="mini-bar-label">INJECT</span><div class="mini-bar-track"><div class="mini-bar-fill" id="mb-inject-fill" style="width:0%;background:#6366F1"></div></div><span class="mini-bar-val" id="mb-inject">0.00</span></div>
+          </div>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="panel-title" style="margin-bottom:6px"><i class="ti ti-activity" style="font-size:12px;margin-right:4px;color:#10B981"></i>Latency Profile</div>
+          <div class="latency-chart"><canvas id="latChart"></canvas></div>
+          <div style="text-align:center;margin-top:4px"><span class="latency-num" id="lat-live">0</span>ms</div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px; font-family:'JetBrains Mono',monospace; font-size:10px;">
+            <div style="text-align:center"><div>p50</div><div style="color:#10B981" id="p50">0ms</div></div>
+            <div style="text-align:center"><div>p95</div><div style="color:#F59E0B" id="p95">0ms</div></div>
+            <div style="text-align:center"><div>p99</div><div style="color:#818CF8" id="p99">0ms</div></div>
+          </div>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="panel-title" style="margin-bottom:6px"><i class="ti ti-cpu" style="font-size:12px;margin-right:4px;color:#818CF8"></i>ML Model Status</div>
+          <div class="model-row"><div class="model-dot" style="background:#F59E0B"></div><span class="model-name">veritas-l1</span><span class="model-status ms-active">ACTIVE</span></div>
+          <div class="model-row"><div class="model-dot" style="background:#818CF8"></div><span class="model-name">distilbert-sv3</span><span class="model-status ms-active">ACTIVE</span></div>
+          <div class="model-row"><div class="model-dot" style="background:#10B981"></div><span class="model-name">arbiter-core</span><span class="model-status ms-active">ACTIVE</span></div>
+          <div class="sparkline-row" id="sparkline"></div>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="panel-title" style="margin-bottom:2px"><i class="ti ti-chart-pie" style="font-size:12px;margin-right:4px;color:#4B5A72"></i>Verdict Distribution</div>
+          <div class="threat-pie">
+            <svg class="pie-svg" viewBox="0 0 52 52">
+              <circle cx="26" cy="26" r="20" fill="none" stroke="#10B981" stroke-width="10" stroke-dasharray="102.8 25.2" transform="rotate(-90 26 26)"/>
+              <circle cx="26" cy="26" r="20" fill="none" stroke="#F59E0B" stroke-width="10" stroke-dasharray="13.8 114.2" stroke-dashoffset="-102.8" transform="rotate(-90 26 26)"/>
+              <circle cx="26" cy="26" r="20" fill="none" stroke="#6366F1" stroke-width="10" stroke-dasharray="8.8 119.2" stroke-dashoffset="-116.6" transform="rotate(-90 26 26)"/>
+              <circle cx="26" cy="26" r="9" fill="#0B0F19"/>
+            </svg>
+            <div class="pie-legend">
+              <div class="pie-leg-row"><div class="pie-dot" style="background:#10B981"></div><span class="pie-leg-label">APPROVED</span><span class="pie-leg-val">82%</span></div>
+              <div class="pie-leg-row"><div class="pie-dot" style="background:#F59E0B"></div><span class="pie-leg-label">L1 BLOCK</span><span class="pie-leg-val">11%</span></div>
+              <div class="pie-leg-row"><div class="pie-dot" style="background:#6366F1"></div><span class="pie-leg-label">L3 QRTN</span><span class="pie-leg-val">7%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="report-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span style="font-size: 12px; font-weight: 600; color: #E2E8F0; font-family: 'JetBrains Mono', monospace;"><i class="ti ti-shield-alert" style="color:#6366F1; margin-right:6px;"></i>ARBITER EXPORT SYSTEM</span>
+        <span onclick="closeReportModal()" style="color: #4B5A72; cursor: pointer; font-size: 16px;">&times;</span>
+      </div>
+      <div class="modal-body" id="modal-report-content"></div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeReportModal()">Close</button>
+        <button class="btn-primary" onclick="window.print()"><i class="ti ti-printer" style="margin-right: 4px;"></i>Print Report</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// Point directly to backend service domain over Docker cluster networking mapping profiles
+const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
+  ? "http://127.0.0.1:8000/api/v1" 
+  : `http://${window.location.hostname}:8000/api/v1`;
+
+const IDS = ["ARB-", "REQ-", "SN-", "VRT-", "TXN-"];
+let entryCount = 0;
+const runtimeLatencyDataset = Array.from({length: 20}, () => 0);
+let lineChartReference;
+const liveTraceCache = {};
+
+function switchView(targetViewId) {
+  document.querySelectorAll('.view-panel-content').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  const panel = document.getElementById(`view-${targetViewId}`);
+  if (panel) panel.style.display = targetViewId === 'dash' ? 'flex' : (targetViewId === 'audit' ? 'flex' : 'block');
+  const btn = document.getElementById(`nav-${targetViewId}`);
+  if (btn) btn.classList.add('active');
+}
+
+function randId() { return IDS[Math.floor(Math.random() * IDS.length)] + Math.floor(Math.random() * 90000 + 10000); }
+function nowTs() { return new Date().toTimeString().slice(0, 8); }
+
+function getBadgeHtml(status) {
+  if (status === "REJECTED_BY_LAYER_1") return '<span class="badge badge-l1">REJECTED_BY_LAYER_1</span>';
+  if (status === "REJECTED_BY_LAYER_3") return '<span class="badge badge-l3">REJECTED_BY_LAYER_3</span>';
+  return '<span class="badge badge-ok">SUCCESS</span>';
+}
+
+function addEntry(prompt, status, layer, reason, conf, lat) {
+  const id = randId(), ts = nowTs(), eid = "e" + entryCount++;
+  const confColor = status === "SUCCESS" ? "lo" : status === "REJECTED_BY_LAYER_1" ? "hi" : "md";
+  
+  liveTraceCache[eid] = { id, ts, prompt, status, layer, reason, conf, lat };
+
+  const html = `
+    <div class="log-entry" id="${eid}">
+      <div class="log-row" onclick="toggleEntry('${eid}')">
+        <span class="log-ts">${ts}</span><span class="log-id">${id}</span>
+        <span class="log-prompt">${prompt}</span>${getBadgeHtml(status)}<span class="log-expand">›</span>
+      </div>
+      <div class="log-detail">
+        <div class="detail-row">
+          <div class="detail-item"><div class="detail-key">Target Layer</div><div class="detail-val">${layer}</div></div>
+          <div class="detail-item"><div class="detail-key">Confidence</div><div class="detail-val ${confColor}">${conf}</div></div>
+          <div class="detail-item"><div class="detail-key">Latency</div><div class="detail-val lo">${lat}</div></div>
+          <div class="detail-item"><div class="detail-key">Verdict Status</div><div class="detail-val ${confColor}">${status}</div></div>
+        </div>
+        <div class="detail-reason"># Analysis Report: ${reason}</div>
+        <button class="btn-report" onclick="launchReportGenerator('${eid}')">
+          <i class="ti ti-file-analytics"></i> Generate Audit Report
+        </button>
+      </div>
+    </div>`;
+  const container = document.getElementById("stream");
+  container.insertAdjacentHTML("afterbegin", html);
+  while (container.children.length > 30) container.removeChild(container.lastChild);
+}
+
+function toggleEntry(id) { document.getElementById(id).classList.toggle("expanded"); }
+
+function launchReportGenerator(eid) {
+  const trace = liveTraceCache[eid];
+  if (!trace) return;
+
+  let cvssScore = "0.0", cvssColor = "#10B981", cvssRating = "NONE", cvssVector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N";
+  
+  if (trace.status === "REJECTED_BY_LAYER_1") {
+    cvssScore = "8.6"; cvssColor = "#F59E0B"; cvssRating = "HIGH";
+    cvssVector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:N";
+  } else if (trace.status === "REJECTED_BY_LAYER_3") {
+    cvssScore = "9.8"; cvssColor = "#EF4444"; cvssRating = "CRITICAL";
+    cvssVector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:N"; // Scope changed, High confidentiality + high integrity risk
+  }
+
+  const reportHtml = `
+    <div style="border: 1px solid #1F293D; padding: 18px; background: #070B13; border-radius: 6px; margin-bottom: 15px;">
+      <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed #1F293D; padding-bottom: 10px; margin-bottom: 14px;">
+        <div><strong>INCIDENT IDENTIFIER:</strong> <span style="color:#818CF8;">${trace.id}</span></div>
+        <div><strong>TIMESTAMP:</strong> ${trace.ts} UTC</div>
+      </div>
+      <div style="display: flex; gap: 20px; margin-bottom: 16px;">
+        <div style="background: #0B0F19; border: 1px solid #1F293D; padding: 10px; border-radius: 4px; text-align: center; min-width: 110px;">
+          <div style="font-size: 9px; color:#4B5A72;">CVSS SEVERITY</div>
+          <div style="font-size: 22px; font-weight:600; color:${cvssColor};">${cvssScore}</div>
+          <div style="font-size: 9px; font-weight:600; color:${cvssColor};">${cvssRating}</div>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-size: 9px; color:#4B5A72;">VULNERABILITY VECTOR STRING</div>
+          <div style="background:#0B0F19; padding: 6px; border-radius:4px; font-size:10px; border: 1px solid #1F293D; color:#CBD5E1; word-break:break-all; margin-top:3px;">${cvssVector}</div>
+        </div>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <div style="font-size: 9px; color:#4B5A72; text-transform:uppercase;">Inbound Intercepted Payload</div>
+        <div style="background:#0B0F19; padding: 10px; border-radius:4px; font-size:11px; border:1px solid #1F293D; margin-top:3px; color:#E2E8F0; white-space:pre-wrap;">${trace.prompt}</div>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <div style="font-size: 9px; color:#4B5A72; text-transform:uppercase;">Mitigation / Threat Intelligence Report</div>
+        <div style="background:#0B0F19; padding: 10px; border-radius:4px; font-size:11px; border:1px solid #1F293D; margin-top:3px; color:#94A3B8;">
+          <strong>Target Mitigating Node:</strong> ${trace.layer}<br>
+          <strong>ML Confidence Engine Vector:</strong> ${trace.conf} Score Matrix<br>
+          <strong>Processing Pipeline Overhead:</strong> ${trace.lat}<br><br>
+          <strong>Investigatory Summary:</strong> ${trace.reason}
+        </div>
+      </div>
+      <div style="font-size: 9px; color:#4B5A72; border-top: 1px dashed #1F293D; padding-top: 10px; text-align: center;">COMPLIANCE AUDIT REGISTER DUMP — SYSTEM ASSURANCE NODE SECURED BY SENINTELL FIREWALL</div>
+    </div>`;
+
+  document.getElementById("modal-report-content").innerHTML = reportHtml;
+  document.getElementById("report-modal").style.display = "flex";
+}
+
+function closeReportModal() { document.getElementById("report-modal").style.display = "none"; }
+
+setInterval(() => {
+  document.getElementById("clock").textContent = new Date().toTimeString().slice(0, 8) + " UTC";
+}, 1000);
+
+async function pollTelemetryServer() {
+  try {
+    const res = await fetch(`${API_BASE}/metrics`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    document.getElementById("c-total").textContent = data.total_screened.toLocaleString();
+    document.getElementById("c-l1").textContent = data.l1_blocks.toLocaleString();
+    document.getElementById("c-l3").textContent = data.l3_quarantines.toLocaleString();
+
+    if (data.analyzer_stats) {
+      document.getElementById("t-jailbreak").textContent = data.analyzer_stats.jailbreak_attempts;
+      document.getElementById("t-leak").textContent = data.analyzer_stats.leak_prevention;
+      const riskEl = document.getElementById("t-risk");
+      riskEl.textContent = data.analyzer_stats.risk_index;
+      riskEl.style.color = data.analyzer_stats.risk_index === "CRITICAL" ? "#EF4444" : "#10B981";
+    }
+
+    const activeL1 = data.l1_blocks - 3204;
+    const activeL3 = data.l3_quarantines - 812;
+    const activeTotal = data.total_screened - 47821;
+    const activeApproved = activeTotal - activeL1 - activeL3;
+
+    let pApproved = 82, pL1 = 11, pL3 = 7;
+    if (activeTotal > 0) {
+      pApproved = Math.max(5, Math.round((activeApproved / activeTotal) * 100));
+      pL1 = Math.max(5, Math.round((activeL1 / activeTotal) * 100));
+      pL3 = Math.max(5, (100 - pApproved - pL1));
+    }
+
+    const pieLegendContainer = document.querySelector(".pie-legend");
+    if (pieLegendContainer) {
+      pieLegendContainer.innerHTML = `
+        <div class="pie-leg-row"><div class="pie-dot" style="background:#10B981"></div><span class="pie-leg-label">APPROVED</span><span class="pie-leg-val">${pApproved}%</span></div>
+        <div class="pie-leg-row"><div class="pie-dot" style="background:#F59E0B"></div><span class="pie-leg-label">L1 BLOCK</span><span class="pie-leg-val">${pL1}%</span></div>
+        <div class="pie-leg-row"><div class="pie-dot" style="background:#6366F1"></div><span class="pie-leg-label">L3 QRTN</span><span class="pie-leg-val">${pL3}%</span></div>`;
+    }
+
+    const circumference = 125.6;
+    const dashApproved = (pApproved / 100) * circumference;
+    const dashL1 = (pL1 / 100) * circumference;
+    const dashL3 = (pL3 / 100) * circumference;
+
+    const pieSvgContainer = document.querySelector(".pie-svg");
+    if (pieSvgContainer) {
+      pieSvgContainer.innerHTML = `
+        <circle cx="26" cy="26" r="20" fill="none" stroke="#10B981" stroke-width="10" stroke-dasharray="${dashApproved} ${circumference - dashApproved}" stroke-dashoffset="0" transform="rotate(-90 26 26)"/>
+        <circle cx="26" cy="26" r="20" fill="none" stroke="#F59E0B" stroke-width="10" stroke-dasharray="${dashL1} ${circumference - dashL1}" stroke-dashoffset="-${dashApproved}" transform="rotate(-90 26 26)"/>
+        <circle cx="26" cy="26" r="20" fill="none" stroke="#6366F1" stroke-width="10" stroke-dasharray="${dashL3} ${circumference - dashL3}" stroke-dashoffset="-${dashApproved + dashL1}" transform="rotate(-90 26 26)"/>
+        <circle cx="26" cy="26" r="9" fill="#0B0F19"/>`;
+    }
+
+    if (data.logs && data.logs.length > 0) {
+      document.getElementById("stream").innerHTML = "";
+      
+      const tableBody = document.getElementById("audit-table-body");
+      while (tableBody.children.length > 3) tableBody.removeChild(tableBody.lastChild);
+
+      const sparklineContainer = document.getElementById("sparkline");
+      if (sparklineContainer) {
+        sparklineContainer.innerHTML = "";
+        data.logs.concat(data.logs).slice(0, 22).forEach(log => {
+          const barNode = document.createElement("div");
+          barNode.className = "spark-bar";
+          let heightPct = "40%", barBg = "#10B981";
+          if (log.status === "REJECTED_BY_LAYER_1") { heightPct = "95%"; barBg = "#F59E0B"; }
+          else if (log.status === "REJECTED_BY_LAYER_3") { heightPct = "75%"; barBg = "#6366F1"; }
+          barNode.style.height = heightPct;
+          barNode.style.background = barBg;
+          sparklineContainer.appendChild(barNode);
+        });
+      }
+
+      data.logs.forEach(log => {
+        addEntry(log.prompt, log.status, log.layer, log.reason, log.confidence.toFixed(2), log.latency);
+        
+        const statusColor = log.status === "SUCCESS" ? "#10B981" : log.status === "REJECTED_BY_LAYER_1" ? "#F59E0B" : "#818CF8";
+        const rowHtml = `
+          <tr style="border-bottom: 1px solid rgba(31, 41, 61, 0.4); color: #CBD5E1;">
+            <td style="padding: 10px 14px; color: #4B5A72;">TXN-${Math.floor(Math.random() * 80000 + 10000)}</td>
+            <td style="padding: 10px 14px;">${log.layer}</td>
+            <td style="padding: 10px 14px;"><span style="color:${statusColor};">${log.status}</span></td>
+            <td style="padding: 10px 14px; text-align: right; color:#64748B;">${log.latency}</td>
+          </tr>`;
+        tableBody.insertAdjacentHTML("afterbegin", rowHtml);
+      });
+
+      const activeTrace = data.logs[data.logs.length - 1];
+      const parsedLat = parseFloat(activeTrace.latency.replace("ms", ""));
+      document.getElementById("c-lat").textContent = parsedLat.toFixed(1);
+      document.getElementById("lat-live").textContent = Math.round(parsedLat);
+      
+      updateGaugeMetrics(parseFloat(activeTrace.confidence), activeTrace.status);
+      updateLineChartTrend(Math.round(parsedLat));
+    }
+  } catch (err) {
+    console.warn("[!] Polling backend connection offline.");
+  }
+}
+
+function updateGaugeMetrics(compositeConfidence, status) {
+  let safeVal = 0.98, toxicVal = 0.01, injectVal = 0.01;
+  if (status === "REJECTED_BY_LAYER_1") { safeVal = 0.03; injectVal = compositeConfidence; toxicVal = (1 - compositeConfidence).toFixed(2); }
+  else if (status === "REJECTED_BY_LAYER_3") { safeVal = 0.12; toxicVal = compositeConfidence; injectVal = (1 - compositeConfidence).toFixed(2); }
+  else { safeVal = (1 - compositeConfidence).toFixed(2); }
+
+  document.getElementById("conf-val").textContent = compositeConfidence.toFixed(2);
+  document.getElementById("mb-safe").textContent = safeVal;
+  document.getElementById("mb-toxic").textContent = toxicVal;
+  document.getElementById("mb-inject").textContent = injectVal;
+  document.getElementById("mb-safe-fill").style.width = (parseFloat(safeVal) * 100) + "%";
+  document.getElementById("mb-toxic-fill").style.width = (parseFloat(toxicVal) * 100) + "%";
+  document.getElementById("mb-inject-fill").style.width = (parseFloat(injectVal) * 100) + "%";
+  
+  document.getElementById("gauge-arc").setAttribute("stroke-dashoffset", 141 - Math.round(compositeConfidence * 141));
+  const rad = (compositeConfidence * Math.PI);
+  document.getElementById("gauge-needle").setAttribute("cx", (55 - 45 * Math.cos(rad)).toFixed(1));
+  document.getElementById("gauge-needle").setAttribute("cy", (62 - 45 * Math.sin(rad)).toFixed(1));
+}
+
+function updateLineChartTrend(nextLatencySample) {
+  if (!lineChartReference) return;
+  runtimeLatencyDataset.shift(); runtimeLatencyDataset.push(nextLatencySample);
+  lineChartReference.data.datasets[0].data = [...runtimeLatencyDataset];
+  lineChartReference.update();
+  const sorted = [...runtimeLatencyDataset].filter(v => v > 0).sort((a, b) => a - b);
+  if (sorted.length === 0) return;
+  document.getElementById("p50").textContent = sorted[Math.floor(sorted.length * 0.5)] + "ms";
+  document.getElementById("p95").textContent = sorted[Math.floor(sorted.length * 0.95)] + "ms";
+  document.getElementById("p99").textContent = sorted[sorted.length - 1] + "ms";
+}
+
+setInterval(pollTelemetryServer, 2000);
+
+(function initSparkline() {
+  const container = document.getElementById("sparkline");
+  const dist = Array.from({length: 22}, () => Math.floor(35 + Math.random() * 65));
+  const max = Math.max(...dist);
+  dist.forEach(pt => {
+    const bar = document.createElement("div");
+    bar.className = "spark-bar"; bar.style.height = ((pt / max) * 100) + "%";
+    bar.style.background = (pt/max) > 0.85 ? "#F59E0B" : (pt/max) > 0.55 ? "#6366F1" : "#10B981";
+    container.appendChild(bar);
+  });
+})();
+
+function initLatencyLineChart() {
+  const canvas = document.getElementById("latChart");
+  if (!canvas || !window.Chart) return;
+  lineChartReference = new Chart(canvas, {
+    type: "line", data: { labels: runtimeLatencyDataset.map((_, i) => i), datasets: [{ data: runtimeLatencyDataset, borderColor: "#10B981", borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.4 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, scales: { x: { display: false }, y: { display: false, min: 0, max: 150 } } }
+  });
+}
+setTimeout(initLatencyLineChart, 150);
+</script>
+</body>
+</html>
